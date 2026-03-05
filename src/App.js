@@ -25,7 +25,9 @@ function App() {
   }, [joined]);
 
   useEffect(() => {
-    socketRef.current = io("http://localhost:5001");
+    socketRef.current = io(
+      process.env.REACT_APP_BACKEND_URL || "http://localhost:5001",
+    );
 
     socketRef.current.on("other-users", (users) => {
       users.forEach((userId) => createPeerConnection(userId, true));
