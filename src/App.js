@@ -25,16 +25,25 @@ function App() {
   }, [joined]);
 
   useEffect(() => {
+    // socketRef.current = io(
+    //   process.env.REACT_APP_BACKEND_URL || "http://localhost:5001",
+    // );
     socketRef.current = io(
-      process.env.REACT_APP_BACKEND_URL || "http://localhost:5001",
+      "https://videocallsumarize-backendnode.onrender.com",
     );
 
     socketRef.current.on("other-users", (users) => {
-      users.forEach((userId) => createPeerConnection(userId, true));
+      users.forEach((userId) => {
+        if (localStreamRef.current) {
+          createPeerConnection(userId, true);
+        }
+      });
     });
 
     socketRef.current.on("user-joined", (userId) => {
-      createPeerConnection(userId, false);
+      if (localStreamRef.current) {
+        createPeerConnection(userId, false);
+      }
     });
 
     socketRef.current.on("offer", async ({ offer, from }) => {
@@ -83,6 +92,11 @@ function App() {
   }, []);
 
   const createPeerConnection = (userId, initiator) => {
+    if (!localStreamRef.current) {
+      console.error("Local stream not available");
+      return;
+    }
+
     const peer = new RTCPeerConnection(ICE_SERVERS);
     peersRef.current[userId] = peer;
 
@@ -91,7 +105,10 @@ function App() {
     });
 
     peer.ontrack = (event) => {
-      setRemoteStreams((prev) => ({ ...prev, [userId]: event.streams[0] }));
+      console.log("Received remote track from", userId);
+      if (event.streams && event.streams[0]) {
+        setRemoteStreams((prev) => ({ ...prev, [userId]: event.streams[0] }));
+      }
     };
 
     peer.onicecandidate = (event) => {
@@ -101,6 +118,13 @@ function App() {
           to: userId,
         });
       }
+    };
+
+    peer.oniceconnectionstatechange = () => {
+      console.log(
+        `ICE connection state with ${userId}:`,
+        peer.iceConnectionState,
+      );
     };
 
     if (initiator) {
